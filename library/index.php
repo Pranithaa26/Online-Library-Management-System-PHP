@@ -1,150 +1,193 @@
 <?php
 session_start();
-error_reporting(0);
 include('includes/config.php');
-if($_SESSION['login']!=''){
-$_SESSION['login']='';
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+
+if (isset($_POST['login'])) {
+    $account_type = $_POST['account_type'];
+    $email = $_POST['emailid'];
+    $password = $_POST['password'];
+
+    try {
+        // Convert account type to lowercase and store it in a variable
+        $account_type_lower = strtolower($account_type);
+
+        // Check credentials in the account table
+        $sql = "SELECT email, password, accountType FROM account WHERE email = :email AND accountType = :account_type";
+        $query = $dbh->prepare($sql);
+        $query->bindParam(':email', $email, PDO::PARAM_STR);
+        $query->bindParam(':account_type', $account_type_lower, PDO::PARAM_STR);
+        $query->execute();
+
+        if ($query->rowCount() > 0) {
+            $result = $query->fetch(PDO::FETCH_ASSOC);
+
+            // Verify password
+            if (password_verify($password, $result['password'])) {
+                $_SESSION['login'] = $email;  // Store email in session for logged-in status
+
+                if ($account_type == 'librarian') {
+                    // Retrieve and set librarian ID in session
+                    $sql = "SELECT librarianID FROM librarian WHERE email = :email";
+                    $query = $dbh->prepare($sql);
+                    $query->bindParam(':email', $email, PDO::PARAM_STR);
+                    $query->execute();
+                    $librarian = $query->fetch(PDO::FETCH_ASSOC);
+                    $_SESSION['librarian_id'] = $librarian['librarianID'];  // Librarian session ID
+
+                    header('Location: admin/librarian_dashboard.php');
+                    exit();
+                } else {
+                    // Retrieve and set user ID in session
+                    $sql = "SELECT userID FROM user WHERE email = :email";
+                    $query = $dbh->prepare($sql);
+                    $query->bindParam(':email', $email, PDO::PARAM_STR);
+                    $query->execute();
+                    $user = $query->fetch(PDO::FETCH_ASSOC);
+                    $_SESSION['user_id'] = $user['userID'];  // User session ID
+
+                    header('Location: dashboard.php');
+                    exit();
+                }
+            } else {
+                echo "<script>alert('Invalid login details');</script>";
+            }
+        } else {
+            echo "<script>alert('Invalid login details');</script>";
+        }
+    } catch (PDOException $e) {
+        echo "Error: " . $e->getMessage();
+    }
 }
-if(isset($_POST['login']))
-{
-
-$email=$_POST['emailid'];
-$password=md5($_POST['password']);
-$sql ="SELECT EmailId,Password,StudentId,Status FROM tblstudents WHERE EmailId=:email and Password=:password";
-$query= $dbh -> prepare($sql);
-$query-> bindParam(':email', $email, PDO::PARAM_STR);
-$query-> bindParam(':password', $password, PDO::PARAM_STR);
-$query-> execute();
-$results=$query->fetchAll(PDO::FETCH_OBJ);
-
-if($query->rowCount() > 0)
-{
- foreach ($results as $result) {
- $_SESSION['stdid']=$result->StudentId;
-if($result->Status==1)
-{
-$_SESSION['login']=$_POST['emailid'];
-echo "<script type='text/javascript'> document.location ='dashboard.php'; </script>";
-} else {
-echo "<script>alert('Your Account Has been blocked .Please contact admin');</script>";
-
-}
-}
-
-} 
-
-else{
-echo "<script>alert('Invalid Details');</script>";
-}
-}
-
 ?>
-<!DOCTYPE html>
-<html xmlns="http://www.w3.org/1999/xhtml">
-<head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
-    <meta name="description" content="" />
-    <meta name="author" content="" />
-    <title>Online Library Management System | </title>
-    <!-- BOOTSTRAP CORE STYLE  -->
-    <link href="assets/css/bootstrap.css" rel="stylesheet" />
-    <!-- FONT AWESOME STYLE  -->
-    <link href="assets/css/font-awesome.css" rel="stylesheet" />
-    <!-- CUSTOM STYLE  -->
-    <link href="assets/css/style.css" rel="stylesheet" />
-    <!-- GOOGLE FONT -->
-    <link href='http://fonts.googleapis.com/css?family=Open+Sans' rel='stylesheet' type='text/css' />
 
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login</title>
+    <link href="assets/css/bootstrap.css" rel="stylesheet" />
+    <link href="assets/css/font-awesome.css" rel="stylesheet" />
+    <style>
+        body {
+            background-image: url('assets/img/bookshelf_background.png');
+            background-repeat: no-repeat;
+            background-attachment: fixed;
+            background-size: cover;
+            font-family: 'Open Sans', sans-serif;
+        }
+
+        .account-type-container {
+            max-width: 400px;
+            margin: auto;
+            text-align: center;
+            padding: 20px;
+            background-color: rgba(0, 0, 0, 0.7); /* Optional: adds a dark background to the container */
+            border-radius: 10px; /* Optional: rounded corners */
+        }
+
+        .account-type-container h2 {
+            margin-bottom: 20px;
+            color: white;
+        }
+
+        .account-option p {
+            color: white;
+        }
+
+        .account-option {
+            display: inline-block;
+            width: 150px;
+            padding: 15px;
+            background-color: black;
+            cursor: pointer;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            margin: 10px;
+            transition: 0.3s;
+        }
+
+        .account-option img {
+            width: 50px;
+            height: 50px;
+        }
+
+        .account-option:hover,
+        .account-option.selected {
+            border-color: #007bff;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+            text-align: left;
+        }
+
+        .form-group label {
+            color: white; /* Change label color to white */
+        }
+
+        input.form-control {
+            color: white; /* Change input text color to white */
+            background-color: rgba(255, 255, 255, 0.1); /* Change background to slightly transparent white */
+            border-color: #ddd;
+        }
+
+        input[type="radio"] {
+            accent-color: white; /* Change radio button color to white */
+        }
+
+        input[type="radio"]:checked {
+            accent-color: #007bff; /* Change color of selected radio button */
+        }
+
+        .btn-login {
+            width: 100%;
+            background-color: #007bff;
+            color: #fff;
+            padding: 10px;
+            font-size: 16px;
+            border-radius: 5px;
+            border: none;
+        }
+
+        .footer-text {
+            margin-top: 30px;
+            color: white;
+            text-align: center;
+        }
+
+        .footer-text a {
+            color: #007bff; /* Make the link color blue */
+        }
+
+    </style>
 </head>
 <body>
-    <!------MENU SECTION START-->
-<?php include('includes/header.php');?>
-<!-- MENU SECTION END-->
-<div class="content-wrapper">
-<div class="container">
-<!--Slider---->
-     <div class="row">
-              <div class="col-md-10 col-sm-8 col-xs-12 col-md-offset-1">
-                    <div id="carousel-example" class="carousel slide slide-bdr" data-ride="carousel" >
-                    <div class="carousel-inner">
-                        <div class="item active">
-                            <img src="assets/img/1.jpg" alt="" />
-                        </div>
-                        <div class="item">
-                            <img src="assets/img/2.jpg" alt="" />
-                        </div>
-                        <div class="item">
-                            <img src="assets/img/3.jpg" alt="" /> 
-                        </div>
-                    </div>
-                    <!--INDICATORS-->
-                     <ol class="carousel-indicators">
-                        <li data-target="#carousel-example" data-slide-to="0" class="active"></li>
-                        <li data-target="#carousel-example" data-slide-to="1"></li>
-                        <li data-target="#carousel-example" data-slide-to="2"></li>
-                    </ol>
-                    <!--PREVIUS-NEXT BUTTONS-->
-                     <a class="left carousel-control" href="#carousel-example" data-slide="prev">
-    <span class="glyphicon glyphicon-chevron-left"></span>
-  </a>
-  <a class="right carousel-control" href="#carousel-example" data-slide="next">
-    <span class="glyphicon glyphicon-chevron-right"></span>
-  </a>
-                </div>
-              </div>
-             </div>
-<hr />
 
+<div class="container account-type-container">
+    <h2>Login</h2>
+    <form method="post">
+        <div class="form-group">
+            <label for="emailid">Email:</label>
+            <input type="email" name="emailid" class="form-control" id="emailid" placeholder="Email" required>
+        </div>
+        <div class="form-group">
+            <label for="password">Password:</label>
+            <input type="password" name="password" class="form-control" id="password" placeholder="Password" required>
+        </div>
+        <div class="form-group">
+            <label>Account Type:</label>
+            <br>
+            <input type="radio" name="account_type" value="librarian" checked> Librarian
+            <input type="radio" name="account_type" value="user"> User
+        </div>
+        <button type="submit" name="login" class="btn-login">Login</button>
+    </form>
 
-
-<div class="row pad-botm">
-<div class="col-md-12">
-<h4 class="header-line">USER LOGIN FORM</h4>
+    <p class="footer-text">Don't have an account? <a href="signup.php" style="color: white;">Sign up</a></p>
 </div>
-</div>
- <a name="ulogin"></a>            
-<!--LOGIN PANEL START-->           
-<div class="row">
-<div class="col-md-6 col-sm-6 col-xs-12 col-md-offset-3" >
-<div class="panel panel-info">
-<div class="panel-heading">
- LOGIN FORM
-</div>
-<div class="panel-body">
-<form role="form" method="post">
-
-<div class="form-group">
-<label>Enter Email id</label>
-<input class="form-control" type="text" name="emailid" required autocomplete="off" />
-</div>
-<div class="form-group">
-<label>Password</label>
-<input class="form-control" type="password" name="password" required autocomplete="off"  />
-<p class="help-block"><a href="user-forgot-password.php">Forgot Password</a></p>
-</div>
-
-
-
- <button type="submit" name="login" class="btn btn-info">LOGIN </button> | <a href="signup.php">Not Register Yet</a>
-</form>
- </div>
-</div>
-</div>
-</div>  
-<!---LOGIN PABNEL END-->            
-             
- 
-    </div>
-    </div>
-     <!-- CONTENT-WRAPPER SECTION END-->
- <?php include('includes/footer.php');?>
-      <!-- FOOTER SECTION END-->
-    <script src="assets/js/jquery-1.10.2.js"></script>
-    <!-- BOOTSTRAP SCRIPTS  -->
-    <script src="assets/js/bootstrap.js"></script>
-      <!-- CUSTOM SCRIPTS  -->
-    <script src="assets/js/custom.js"></script>
 
 </body>
 </html>

@@ -1,157 +1,133 @@
-<?php 
+<?php
 session_start();
 include('includes/config.php');
-error_reporting(0);
-if(isset($_POST['signup']))
-{
- 
-//Code for student ID
-$count_my_page = ("studentid.txt");
-$hits = file($count_my_page);
-$hits[0] ++;
-$fp = fopen($count_my_page , "w");
-fputs($fp , "$hits[0]");
-fclose($fp); 
-$StudentId= $hits[0];   
-$fname=$_POST['fullanme'];
-$mobileno=$_POST['mobileno'];
-$email=$_POST['email']; 
-$password=md5($_POST['password']); 
-$status=1;
-$sql="INSERT INTO  tblstudents(StudentId,FullName,MobileNumber,EmailId,Password,Status) VALUES(:StudentId,:fname,:mobileno,:email,:password,:status)";
-$query = $dbh->prepare($sql);
-$query->bindParam(':StudentId',$StudentId,PDO::PARAM_STR);
-$query->bindParam(':fname',$fname,PDO::PARAM_STR);
-$query->bindParam(':mobileno',$mobileno,PDO::PARAM_STR);
-$query->bindParam(':email',$email,PDO::PARAM_STR);
-$query->bindParam(':password',$password,PDO::PARAM_STR);
-$query->bindParam(':status',$status,PDO::PARAM_STR);
-$query->execute();
-$lastInsertId = $dbh->lastInsertId();
-if($lastInsertId)
-{
-echo '<script>alert("Your Registration successfull and your student id is  "+"'.$StudentId.'")</script>';
-}
-else 
-{
-echo "<script>alert('Something went wrong. Please try again');</script>";
-}
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+
+// Function to sanitize inputs
+function sanitize_input($data) {
+    return htmlspecialchars(stripslashes(trim($data)));
 }
 
+// Initialize $account_type to avoid the undefined variable warning
+$account_type = $_POST['account_type'] ?? '';
+
+if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['signup'])) {
+    $username = sanitize_input($_POST['username'] ?? '');
+    $email = sanitize_input($_POST['emailid'] ?? '');
+    $password = sanitize_input($_POST['password'] ?? '');
+    $confirm_password = sanitize_input($_POST['confirm_password'] ?? '');
+    $account_type = sanitize_input($_POST['account_type'] ?? ''); // Make sure to capture account_type
+
+    // Input validation
+    if (empty($username) || empty($email) || empty($password) || empty($confirm_password) || empty($account_type)) {
+        $error_message = "All fields are required.";
+    } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        $error_message = "Invalid email format.";
+    } elseif ($password !== $confirm_password) {
+        $error_message = "Passwords do not match.";
+    } else {
+        // Password hashing
+        $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
+
+        try {
+            // Check if the email already exists
+            $sql = "SELECT email FROM account WHERE email = :email";
+            $query = $dbh->prepare($sql);
+            $query->bindParam(':email', $email, PDO::PARAM_STR);
+            $query->execute();
+
+            if ($query->rowCount() > 0) {
+                $error_message = "Email is already registered.";
+            } else {
+                // Insert into the account table (without 'confirmPassword')
+                $sql = "INSERT INTO account (username, email, password, accountType) 
+                        VALUES (:username, :email, :password, :account_type)";
+                $query = $dbh->prepare($sql);
+                $query->bindParam(':username', $username, PDO::PARAM_STR);
+                $query->bindParam(':email', $email, PDO::PARAM_STR);
+                $query->bindParam(':password', $hashedPassword, PDO::PARAM_STR);
+                $query->bindParam(':account_type', $account_type, PDO::PARAM_STR);
+                $query->execute();
+
+                // Insert into the corresponding user or librarian table
+                if ($account_type === 'librarian') {
+                    $sql = "INSERT INTO librarian (name, email) VALUES (:username, :email)";
+                } else {
+                    $sql = "INSERT INTO user (name, email) VALUES (:username, :email)";
+                }
+                $query = $dbh->prepare($sql);
+                $query->bindParam(':username', $username, PDO::PARAM_STR);
+                $query->bindParam(':email', $email, PDO::PARAM_STR);
+                $query->execute();
+
+                $success_message = ucfirst($account_type) . " account created successfully!";
+                header("Location: index.php?message=" . urlencode($success_message));
+                exit();
+            }
+        } catch (PDOException $e) {
+            $error_message = "Error: " . $e->getMessage();
+        }
+    }
+}
 ?>
 
 <!DOCTYPE html>
-<html xmlns="http://www.w3.org/1999/xhtml">
+<html lang="en">
 <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
-    <meta name="description" content="" />
-    <meta name="author" content="" />
-    <!--[if IE]>
-        <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
-        <![endif]-->
-    <title>Online Library Management System | Student Signup</title>
-    <!-- BOOTSTRAP CORE STYLE  -->
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Signup</title>
     <link href="assets/css/bootstrap.css" rel="stylesheet" />
-    <!-- FONT AWESOME STYLE  -->
     <link href="assets/css/font-awesome.css" rel="stylesheet" />
-    <!-- CUSTOM STYLE  -->
-    <link href="assets/css/style.css" rel="stylesheet" />
-    <!-- GOOGLE FONT -->
-    <link href='http://fonts.googleapis.com/css?family=Open+Sans' rel='stylesheet' type='text/css' />
-<script type="text/javascript">
-function valid()
-{
-if(document.signup.password.value!= document.signup.confirmpassword.value)
-{
-alert("Password and Confirm Password Field do not match  !!");
-document.signup.confirmpassword.focus();
-return false;
-}
-return true;
-}
-</script>
-<script>
-function checkAvailability() {
-$("#loaderIcon").show();
-jQuery.ajax({
-url: "check_availability.php",
-data:'emailid='+$("#emailid").val(),
-type: "POST",
-success:function(data){
-$("#user-availability-status").html(data);
-$("#loaderIcon").hide();
-},
-error:function (){}
-});
-}
-</script>    
-
+    <style>
+        .container {
+            margin-top: 50px;
+            max-width: 600px;
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0px 0px 10px 0px rgba(0, 0, 0, 0.1);
+        }
+        .alert {
+            margin-top: 10px;
+        }
+    </style>
 </head>
 <body>
-    <!------MENU SECTION START-->
-<?php include('includes/header.php');?>
-<!-- MENU SECTION END-->
-    <div class="content-wrapper">
-         <div class="container">
-        <div class="row pad-botm">
-            <div class="col-md-12">
-                <h4 class="header-line">User Signup</h4>
-                
-                            </div>
 
+<div class="container">
+    <h2>Create Account</h2>
+    <?php if (!empty($error_message)): ?>
+        <div class="alert alert-danger"><?php echo $error_message; ?></div>
+    <?php elseif (!empty($success_message)): ?>
+        <div class="alert alert-success"><?php echo $success_message; ?></div>
+    <?php endif; ?>
+    <form method="post">
+        <div class="form-group">
+            <label>Username</label>
+            <input type="text" name="username" class="form-control" placeholder="Username" value="<?php echo htmlspecialchars($username ?? ''); ?>" required>
         </div>
-             <div class="row">
-           
-<div class="col-md-9 col-md-offset-1">
-               <div class="panel panel-danger">
-                        <div class="panel-heading">
-                           SINGUP FORM
-                        </div>
-                        <div class="panel-body">
-                            <form name="signup" method="post" onSubmit="return valid();">
-<div class="form-group">
-<label>Name</label>
-<input class="form-control" type="text" name="fullname" autocomplete="off" required />
-</div>
-
-
-<div class="form-group">
-<label>Mobile Number :</label>
-<input class="form-control" type="text" name="mobileno" maxlength="10" autocomplete="off" required />
-</div>
-                                        
-<div class="form-group">
-<label>Email</label>
-<input class="form-control" type="email" name="email" id="emailid" onBlur="checkAvailability()"  autocomplete="off" required  />
-   <span id="user-availability-status" style="font-size:12px;"></span> 
-</div>
-
-<div class="form-group">
-<label>Password</label>
-<input class="form-control" type="password" name="password" autocomplete="off" required  />
-</div>
-
-<div class="form-group">
-<label>Confirm Password </label>
-<input class="form-control"  type="password" name="confirmpassword" autocomplete="off" required  />
-</div>
-                             
-<button type="submit" name="signup" class="btn btn-danger" id="submit">Register Now </button>
-
-                                    </form>
-                            </div>
-                        </div>
-                            </div>
+        <div class="form-group">
+            <label>Email</label>
+            <input type="email" name="emailid" class="form-control" placeholder="Email" value="<?php echo htmlspecialchars($email ?? ''); ?>" required>
         </div>
-    </div>
-    </div>
-     <!-- CONTENT-WRAPPER SECTION END-->
-    <?php include('includes/footer.php');?>
-    <script src="assets/js/jquery-1.10.2.js"></script>
-    <!-- BOOTSTRAP SCRIPTS  -->
-    <script src="assets/js/bootstrap.js"></script>
-      <!-- CUSTOM SCRIPTS  -->
-    <script src="assets/js/custom.js"></script>
+        <div class="form-group">
+            <label>Password</label>
+            <input type="password" name="password" class="form-control" placeholder="Password" required>
+        </div>
+        <div class="form-group">
+            <label>Confirm Password</label>
+            <input type="password" name="confirm_password" class="form-control" placeholder="Confirm Password" required>
+        </div>
+        <div class="form-group">
+            <label>Account Type</label><br>
+            <input type="radio" name="account_type" value="librarian" <?php echo ($account_type === 'librarian') ? 'checked' : ''; ?>> Librarian
+            <input type="radio" name="account_type" value="user" <?php echo ($account_type === 'user') ? 'checked' : ''; ?>> User
+        </div>
+        <button type="submit" name="signup" class="btn btn-primary">Signup</button>
+    </form>
+</div>
+
 </body>
 </html>

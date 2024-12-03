@@ -2,17 +2,13 @@
 session_start();
 error_reporting(0);
 include('includes/config.php');
-if(strlen($_SESSION['alogin'])==0)
-    {   
-header('location:index.php');
-}
-else{ 
+
 
 if(isset($_POST['update']))
 {
 $athrid=intval($_GET['athrid']);
 $author=$_POST['author'];
-$sql="update  tblauthors set AuthorName=:author where id=:athrid";
+$sql="update  authors set AuthorName=:author where id=:athrid";
 $query = $dbh->prepare($sql);
 $query->bindParam(':author',$author,PDO::PARAM_STR);
 $query->bindParam(':athrid',$athrid,PDO::PARAM_STR);
@@ -68,7 +64,7 @@ Author Info
 <label>Author Name</label>
 <?php 
 $athrid=intval($_GET['athrid']);
-$sql = "SELECT * from  tblauthors where id=:athrid";
+$sql = "SELECT * from  authors where id=:athrid";
 $query = $dbh -> prepare($sql);
 $query->bindParam(':athrid',$athrid,PDO::PARAM_STR);
 $query->execute();
@@ -105,4 +101,4 @@ foreach($results as $result)
     <script src="assets/js/custom.js"></script>
 </body>
 </html>
-<?php } ?>
+<?php ?>

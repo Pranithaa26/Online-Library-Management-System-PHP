@@ -2,32 +2,45 @@
 session_start();
 error_reporting(0);
 include('includes/config.php');
-if(strlen($_SESSION['alogin'])==0)
-    {   
-header('location:index.php');
-}
-else{ 
 
-if(isset($_POST['update']))
-{
-$bookname=$_POST['bookname'];
-$category=$_POST['category'];
-$author=$_POST['author'];
-$isbn=$_POST['isbn'];
-$price=$_POST['price'];
-$bookid=intval($_GET['bookid']);
-$sql="update  tblbooks set BookName=:bookname,CatId=:category,AuthorId=:author,BookPrice=:price where id=:bookid";
-$query = $dbh->prepare($sql);
-$query->bindParam(':bookname',$bookname,PDO::PARAM_STR);
-$query->bindParam(':category',$category,PDO::PARAM_STR);
-$query->bindParam(':author',$author,PDO::PARAM_STR);
-$query->bindParam(':price',$price,PDO::PARAM_STR);
-$query->bindParam(':bookid',$bookid,PDO::PARAM_STR);
-$query->execute();
-echo "<script>alert('Book info updated successfully');</script>";
-echo "<script>window.location.href='manage-books.php'</script>";
+if(isset($_POST['update'])){
+    // Get and sanitize input values
+    $bookname = filter_var($_POST['bookname'], FILTER_SANITIZE_STRING);
+    $category = filter_var($_POST['category'], FILTER_SANITIZE_STRING);
+    $author = filter_var($_POST['author'], FILTER_SANITIZE_STRING);
+    $isbn = filter_var($_POST['isbn'], FILTER_SANITIZE_STRING);
+    $description = filter_var($_POST['description'], FILTER_SANITIZE_STRING);
 
+    // Check if a new image is uploaded
+    if (isset($_FILES['bookimage']) && $_FILES['bookimage']['error'] == 0) {
+        // Validate and move uploaded image
+        $imagePath = 'bookimg/' . basename($_FILES['bookimage']['name']);
+        if(move_uploaded_file($_FILES['bookimage']['tmp_name'], $imagePath)) {
+            $imageUpload = $imagePath;
+        } else {
+            echo "<script>alert('Error uploading image');</script>";
+            exit;
+        }
+    } else {
+        // Keep existing image if no new image is uploaded
+        $imageUpload = $_POST['existing_image'];
+    }
 
+    $bookid = filter_var($_GET['bookid'], FILTER_SANITIZE_NUMBER_INT);
+
+    // Update query
+    $sql = "UPDATE book SET title=:bookname, category=:category, authors=:author, ISBN=:isbn, image=:bookImage, description=:description WHERE ISBN=:isbn";
+    $query = $dbh->prepare($sql);
+    $query->bindParam(':bookname', $bookname, PDO::PARAM_STR);
+    $query->bindParam(':category', $category, PDO::PARAM_STR);
+    $query->bindParam(':author', $author, PDO::PARAM_STR);
+    $query->bindParam(':isbn', $isbn, PDO::PARAM_STR);
+    $query->bindParam(':bookImage', $imageUpload, PDO::PARAM_STR);
+    $query->bindParam(':description', $description, PDO::PARAM_STR);
+    $query->execute();
+
+    echo "<script>alert('Book info updated successfully');</script>";
+    echo "<script>window.location.href='manage-books.php'</script>";
 }
 ?>
 <!DOCTYPE html>
@@ -38,153 +51,104 @@ echo "<script>window.location.href='manage-books.php'</script>";
     <meta name="description" content="" />
     <meta name="author" content="" />
     <title>Online Library Management System | Edit Book</title>
-    <!-- BOOTSTRAP CORE STYLE  -->
     <link href="assets/css/bootstrap.css" rel="stylesheet" />
-    <!-- FONT AWESOME STYLE  -->
     <link href="assets/css/font-awesome.css" rel="stylesheet" />
-    <!-- CUSTOM STYLE  -->
     <link href="assets/css/style.css" rel="stylesheet" />
-    <!-- GOOGLE FONT -->
     <link href='http://fonts.googleapis.com/css?family=Open+Sans' rel='stylesheet' type='text/css' />
-
 </head>
 <body>
-      <!------MENU SECTION START-->
-<?php include('includes/header.php');?>
-<!-- MENU SECTION END-->
-    <div class="content-wrapper">
-         <div class="container">
+
+<div class="content-wrapper">
+    <div class="container">
         <div class="row pad-botm">
             <div class="col-md-12">
-                <h4 class="header-line">Add Book</h4>
-                
-                            </div>
-
-</div>
-<div class="row">
-<div class="col-md12 col-sm-12 col-xs-12">
-<div class="panel panel-info">
-<div class="panel-heading">
-Book Info
-</div>
-<div class="panel-body">
-<form role="form" method="post">
-<?php 
-$bookid=intval($_GET['bookid']);
-$sql = "SELECT tblbooks.BookName,tblcategory.CategoryName,tblcategory.id as cid,tblauthors.AuthorName,tblauthors.id as athrid,tblbooks.ISBNNumber,tblbooks.BookPrice,tblbooks.id as bookid,tblbooks.bookImage from  tblbooks join tblcategory on tblcategory.id=tblbooks.CatId join tblauthors on tblauthors.id=tblbooks.AuthorId where tblbooks.id=:bookid";
-$query = $dbh -> prepare($sql);
-$query->bindParam(':bookid',$bookid,PDO::PARAM_STR);
-$query->execute();
-$results=$query->fetchAll(PDO::FETCH_OBJ);
-$cnt=1;
-if($query->rowCount() > 0)
-{
-foreach($results as $result)
-{               ?>  
-
-<div class="col-md-6">
-<div class="form-group">
-<label>Book Image</label>
-<img src="bookimg/<?php echo htmlentities($result->bookImage);?>" width="100">
-<a href="change-bookimg.php?bookid=<?php echo htmlentities($result->bookid);?>">Change Book Image</a>
-</div></div>
-
-<div class="col-md-6">
-<div class="form-group">
-<label>Book Name<span style="color:red;">*</span></label>
-<input class="form-control" type="text" name="bookname" value="<?php echo htmlentities($result->BookName);?>" required />
-</div></div>
-
-<div class="col-md-6">
-<div class="form-group">
-<label> Category<span style="color:red;">*</span></label>
-<select class="form-control" name="category" required="required">
-<option value="<?php echo htmlentities($result->cid);?>"> <?php echo htmlentities($catname=$result->CategoryName);?></option>
-<?php 
-$status=1;
-$sql1 = "SELECT * from  tblcategory where Status=:status";
-$query1 = $dbh -> prepare($sql1);
-$query1-> bindParam(':status',$status, PDO::PARAM_STR);
-$query1->execute();
-$resultss=$query1->fetchAll(PDO::FETCH_OBJ);
-if($query1->rowCount() > 0)
-{
-foreach($resultss as $row)
-{           
-if($catname==$row->CategoryName)
-{
-continue;
-}
-else
-{
-    ?>  
-<option value="<?php echo htmlentities($row->id);?>"><?php echo htmlentities($row->CategoryName);?></option>
- <?php }}} ?> 
-</select>
-</div></div>
-
-<div class="col-md-6">
-<div class="form-group">
-<label> Author<span style="color:red;">*</span></label>
-<select class="form-control" name="author" required="required">
-<option value="<?php echo htmlentities($result->athrid);?>"> <?php echo htmlentities($athrname=$result->AuthorName);?></option>
-<?php 
-
-$sql2 = "SELECT * from  tblauthors ";
-$query2 = $dbh -> prepare($sql2);
-$query2->execute();
-$result2=$query2->fetchAll(PDO::FETCH_OBJ);
-if($query2->rowCount() > 0)
-{
-foreach($result2 as $ret)
-{           
-if($athrname==$ret->AuthorName)
-{
-continue;
-} else{
-
-    ?>  
-<option value="<?php echo htmlentities($ret->id);?>"><?php echo htmlentities($ret->AuthorName);?></option>
- <?php }}} ?> 
-</select>
-</div></div>
-
-
-<div class="col-md-6">
-<div class="form-group">
-<label>ISBN Number<span style="color:red;">*</span></label>
-<input class="form-control" type="text" name="isbn" value="<?php echo htmlentities($result->ISBNNumber);?>"  readonly />
-<p class="help-block">An ISBN is an International Standard Book Number.ISBN Must be unique</p>
-</div></div>
-
-
-<div class="col-md-6">
- <div class="form-group">
- <label>Price in USD<span style="color:red;">*</span></label>
- <input class="form-control" type="text" name="price" value="<?php echo htmlentities($result->BookPrice);?>"   required="required" />
- </div></div>
- <?php }} ?><div class="col-md-12">
-<button type="submit" name="update" class="btn btn-info">Update </button></div>
-
-                                    </form>
-                            </div>
-                        </div>
-                            </div>
-
+                <h4 class="header-line">Edit Book</h4>
+            </div>
         </div>
-   
+
+        <div class="row">
+            <div class="col-md-12">
+                <div class="panel panel-info">
+                    <div class="panel-heading">Book Info</div>
+                    <div class="panel-body">
+                        <form role="form" method="post" enctype="multipart/form-data">
+<?php 
+    $bookid = filter_var($_GET['bookid'], FILTER_SANITIZE_NUMBER_INT);
+    $sql = "SELECT * FROM book WHERE ISBN = :isbn";
+    $query = $dbh->prepare($sql);
+    $query->bindParam(':isbn', $bookid, PDO::PARAM_STR);
+    $query->execute();
+    $results = $query->fetchAll(PDO::FETCH_OBJ);
+
+    if ($query->rowCount() > 0) {
+        foreach ($results as $result) {
+?>
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label>Book Image</label>
+                                    <img src="bookimg/<?php echo htmlentities($result->image);?>" width="100">
+                                    <a href="change-bookimg.php?isbn=<?php echo htmlentities($result->ISBN);?>">Change Book Image</a>
+                                    <input type="hidden" name="existing_image" value="<?php echo htmlentities($result->image);?>">
+                                </div>
+                            </div>
+
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label>Book Name<span style="color:red;">*</span></label>
+                                    <input class="form-control" type="text" name="bookname" value="<?php echo htmlentities($result->title);?>" required />
+                                </div>
+                            </div>
+
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label>Category<span style="color:red;">*</span></label>
+                                    <input class="form-control" type="text" name="category" value="<?php echo htmlentities($result->category);?>" required />
+                                </div>
+                            </div>
+
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label>Author<span style="color:red;">*</span></label>
+                                    <input class="form-control" type="text" name="author" value="<?php echo htmlentities($result->authors);?>" required />
+                                </div>
+                            </div>
+
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label>ISBN Number<span style="color:red;">*</span></label>
+                                    <input class="form-control" type="text" name="isbn" value="<?php echo htmlentities($result->ISBN);?>" readonly />
+                                    <p class="help-block">An ISBN is an International Standard Book Number. ISBN must be unique.</p>
+                                </div>
+                            </div>
+
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label>Book Description<span style="color:red;">*</span></label>
+                                    <textarea class="form-control" name="description" required="required"><?php echo htmlentities($result->description);?></textarea>
+                                </div>
+                            </div>
+
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label>Change Book Image</label>
+                                    <input type="file" name="bookimage" class="form-control">
+                                </div>
+                            </div>
+<?php }} ?>
+                            <div class="col-md-12">
+                                <button type="submit" name="update" class="btn btn-info">Update</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
-    </div>
-     <!-- CONTENT-WRAPPER SECTION END-->
-  <?php include('includes/footer.php');?>
-      <!-- FOOTER SECTION END-->
-    <!-- JAVASCRIPT FILES PLACED AT THE BOTTOM TO REDUCE THE LOADING TIME  -->
-    <!-- CORE JQUERY  -->
-    <script src="assets/js/jquery-1.10.2.js"></script>
-    <!-- BOOTSTRAP SCRIPTS  -->
-    <script src="assets/js/bootstrap.js"></script>
-      <!-- CUSTOM SCRIPTS  -->
-    <script src="assets/js/custom.js"></script>
+</div>
+
+<script src="assets/js/jquery-1.10.2.js"></script>
+<script src="assets/js/bootstrap.js"></script>
+<script src="assets/js/custom.js"></script>
+
 </body>
 </html>
-<?php } ?>

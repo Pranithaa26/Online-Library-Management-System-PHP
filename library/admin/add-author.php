@@ -2,31 +2,23 @@
 session_start();
 error_reporting(0);
 include('includes/config.php');
-if(strlen($_SESSION['alogin'])==0)
-    {   
-header('location:index.php');
-}
-else{ 
 
-if(isset($_POST['create']))
-{
-$author=$_POST['author'];
-$sql="INSERT INTO  tblauthors(AuthorName) VALUES(:author)";
-$query = $dbh->prepare($sql);
-$query->bindParam(':author',$author,PDO::PARAM_STR);
-$query->execute();
-$lastInsertId = $dbh->lastInsertId();
-if($lastInsertId)
-{
-$_SESSION['msg']="Author Listed successfully";
-header('location:manage-authors.php');
-}
-else 
-{
-$_SESSION['error']="Something went wrong. Please try again";
-header('location:manage-authors.php');
-}
+// Handling the author addition
+if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+    $authorName = $_POST['authorName'];
 
+    // Insert the new author into the database
+    $sql = "INSERT INTO authors (AuthorName) VALUES (:authorName)";
+    $query = $dbh->prepare($sql);
+    $query->bindParam(':authorName', $authorName, PDO::PARAM_STR);
+
+    if ($query->execute()) {
+        $_SESSION['msg'] = "Author added successfully!";
+        header('location: manage-authors.php');
+        exit();
+    } else {
+        $_SESSION['error'] = "Error adding author.";
+    }
 }
 ?>
 <!DOCTYPE html>
@@ -37,64 +29,56 @@ header('location:manage-authors.php');
     <meta name="description" content="" />
     <meta name="author" content="" />
     <title>Online Library Management System | Add Author</title>
-    <!-- BOOTSTRAP CORE STYLE  -->
-    <link href="assets/css/bootstrap.css" rel="stylesheet" />
-    <!-- FONT AWESOME STYLE  -->
-    <link href="assets/css/font-awesome.css" rel="stylesheet" />
-    <!-- CUSTOM STYLE  -->
-    <link href="assets/css/style.css" rel="stylesheet" />
-    <!-- GOOGLE FONT -->
-    <link href='http://fonts.googleapis.com/css?family=Open+Sans' rel='stylesheet' type='text/css' />
 
+    <link href="assets/css/bootstrap.css" rel="stylesheet" />
+    <link href="assets/css/font-awesome.css" rel="stylesheet" />
+    <link href="assets/css/style.css" rel="stylesheet" />
+    <style>
+        /* Add your custom styles here */
+    </style>
 </head>
 <body>
-      <!------MENU SECTION START-->
-<?php include('includes/header.php');?>
-<!-- MENU SECTION END-->
-    <div class="content-wra
-    <div class="content-wrapper">
-         <div class="container">
-        <div class="row pad-botm">
-            <div class="col-md-12">
-                <h4 class="header-line">Add Author</h4>
-                
-                            </div>
+    <!-- MENU SECTION START-->
+    <?php include('includes/header.php'); ?>
+    <!-- MENU SECTION END-->
 
-</div>
-<div class="row">
-<div class="col-md-6 col-sm-6 col-xs-12 col-md-offset-3"">
-<div class="panel panel-info">
-<div class="panel-heading">
-Author Info
-</div>
-<div class="panel-body">
-<form role="form" method="post">
-<div class="form-group">
-<label>Author Name</label>
-<input class="form-control" type="text" name="author" autocomplete="off"  required />
-</div>
+    <div class="container">
+        <h4 class="header-line">Add Author</h4>
 
-<button type="submit" name="create" class="btn btn-info">Add </button>
-
-                                    </form>
-                            </div>
-                        </div>
-                            </div>
-
+        <!-- Error and Success Messages -->
+        <?php if ($_SESSION['error'] != "") { ?>
+        <div class="alert alert-danger">
+            <strong>Error :</strong> <?php echo htmlentities($_SESSION['error']); ?>
         </div>
-   
+        <?php $_SESSION['error'] = ""; } ?>
+
+        <?php if ($_SESSION['msg'] != "") { ?>
+        <div class="alert alert-success">
+            <strong>Success :</strong> <?php echo htmlentities($_SESSION['msg']); ?>
+        </div>
+        <?php $_SESSION['msg'] = ""; } ?>
+
+        <!-- Author Add Form -->
+        <form method="post" name="addauthor" class="form-horizontal">
+            <div class="form-group">
+                <label for="authorName" class="control-label col-md-2">Author Name</label>
+                <div class="col-md-4">
+                    <input type="text" name="authorName" class="form-control" required />
+                </div>
+            </div>
+
+            <div class="form-group">
+                <div class="col-md-4 col-md-offset-2">
+                    <button type="submit" class="btn btn-success">Add Author</button>
+                </div>
+            </div>
+        </form>
     </div>
-    </div>
-     <!-- CONTENT-WRAPPER SECTION END-->
-  <?php include('includes/footer.php');?>
-      <!-- FOOTER SECTION END-->
-    <!-- JAVASCRIPT FILES PLACED AT THE BOTTOM TO REDUCE THE LOADING TIME  -->
-    <!-- CORE JQUERY  -->
+
+    <!-- FOOTER SECTION END-->
+    <?php include('includes/footer.php'); ?>
+
     <script src="assets/js/jquery-1.10.2.js"></script>
-    <!-- BOOTSTRAP SCRIPTS  -->
     <script src="assets/js/bootstrap.js"></script>
-      <!-- CUSTOM SCRIPTS  -->
-    <script src="assets/js/custom.js"></script>
 </body>
 </html>
-<?php } ?>
